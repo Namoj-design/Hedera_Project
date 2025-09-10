@@ -21,13 +21,12 @@ async function environmentSetup() {
         );
     }
 
-    // Explicitly parse the account ID and private key
+    // Explicitly parse account ID and private key
     const operatorId = AccountId.fromString(myAccountId);
     const operatorKey = PrivateKey.fromStringED25519(myPrivateKey);
 
     // Create client
     const client = Client.forTestnet().setOperator(operatorId, operatorKey);
-
     client.setDefaultMaxTransactionFee(new Hbar(100));
     client.setMaxQueryPayment(new Hbar(50));
 
@@ -44,18 +43,38 @@ async function environmentSetup() {
     const newAccountReceipt = await newAccountTransactionResponse.getReceipt(client);
     const newAccountId = newAccountReceipt.accountId;
 
-    console.log("✅ New account created: " + newAccountId.toString());
+    console.log("New account created: " + newAccountId.toString());
 
-    // Query balance
-    const accountBalance = await new AccountBalanceQuery()
+    // Query new account balance
+    let newAccountBalance = await new AccountBalanceQuery()
         .setAccountId(newAccountId)
         .execute(client);
 
-    console.log(
-        "💰 New account balance: " +
-            accountBalance.hbars.toTinybars() +
-            " tinybars."
-    );
+    console.log("New account balance: " + newAccountBalance.hbars.toTinybars() + " tinybars");
+
+    // Transfer some Hbar from operator to new account
+    console.log("Transferring 1000 tinybars from operator to new account...");
+
+    const transferTx = await new TransferTransaction()
+        .addHbarTransfer(operatorId, Hbar.fromTinybars(-1000)) // from operator
+        .addHbarTransfer(newAccountId, Hbar.fromTinybars(1000)) // to new account
+        .execute(client);
+
+    await transferTx.getReceipt(client);
+
+    console.log("Transfer complete.");
+
+    // Query balances again
+    const operatorBalance = await new AccountBalanceQuery()
+        .setAccountId(operatorId)
+        .execute(client);
+
+    newAccountBalance = await new AccountBalanceQuery()
+        .setAccountId(newAccountId)
+        .execute(client);
+
+    console.log("Operator balance: " + operatorBalance.hbars.toTinybars() + " tinybars");
+    console.log("New account balance: " + newAccountBalance.hbars.toTinybars() + " tinybars");
 
     return { client, newAccountId, newAccountPrivateKey };
 }
