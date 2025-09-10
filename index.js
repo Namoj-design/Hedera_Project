@@ -9,7 +9,6 @@ const {
 } = require("@hashgraph/sdk");
 
 require("dotenv").config();
-
 async function environmentSetup() {
     // Grab operator ID and private key from .env
     const myAccountId = process.env.MY_ACCOUNT_ID;
@@ -41,7 +40,7 @@ async function environmentSetup() {
     client.setDefaultMaxTransactionFee(new Hbar(100));
     client.setMaxQueryPayment(new Hbar(50));
     client.setMaxAttempts(5);
-    client.setRequestTimeout(120_000);
+    client.setRequestTimeout(120_000);                               
 
     // Generate new account keys
     const newAccountPrivateKey = PrivateKey.generateED25519();
