@@ -25,10 +25,12 @@ async function environmentSetup() {
     const operatorId = AccountId.fromString(myAccountId);
     const operatorKey = PrivateKey.fromStringED25519(myPrivateKey);
 
-    // Create client
+    // Create client with retry and timeout settings
     const client = Client.forTestnet().setOperator(operatorId, operatorKey);
     client.setDefaultMaxTransactionFee(new Hbar(100));
     client.setMaxQueryPayment(new Hbar(50));
+    client.setMaxAttempts(3); // limit retries
+    client.setRequestTimeout(30_000); // 30 seconds
 
     // Generate new account keys
     const newAccountPrivateKey = PrivateKey.generateED25519();
