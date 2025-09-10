@@ -10,7 +10,6 @@ const {
 require("dotenv").config();
 
 async function environmentSetup() {
-    // Grab your Hedera testnet account ID and private key from your .env file
     const myAccountId = process.env.MY_ACCOUNT_ID;
     const myPrivateKey = process.env.MY_PRIVATE_KEY;
 
@@ -20,29 +19,35 @@ async function environmentSetup() {
         );
     }
 
-    // Create your Hedera Testnet client
     const client = Client.forTestnet();
-
-    // Set your account as the client's operator
     client.setOperator(myAccountId, myPrivateKey);
-
-    // Set the default maximum transaction fee (in Hbar)
     client.setDefaultMaxTransactionFee(new Hbar(100));
-
-    // Set the maximum payment for queries (in Hbar)
     client.setMaxQueryPayment(new Hbar(50));
 
+    // Generate new account keys
     const newAccountPrivateKey = PrivateKey.generateED25519();
     const newAccountPublicKey = newAccountPrivateKey.publicKey;
 
-    const newAccountTransaction = new AccountCreateTransaction()
+    // Create new account
+    const newAccountTransactionResponse = await new AccountCreateTransaction()
         .setKey(newAccountPublicKey)
-        .setInitialBalance(Hbar.fromTinybars(1000));
-        .execute(Client);
+        .setInitialBalance(Hbar.fromTinybars(1000))
+        .execute(client);
 
+    // Get receipt
+    const newAccountReceipt = await newAccountTransactionResponse.getReceipt(client);
+    const newAccountId = newAccountReceipt.accountId;
 
+    console.log("The new account ID is: " + newAccountId.toString());
 
+    // Query balance
+    const accountBalance = await new AccountBalanceQuery()
+        .setAccountId(newAccountId)
+        .execute(client);
 
+    console.log(
+        "The new account balance is: " + accountBalance.hbars.toTinybars() + " tinybars."
+    );
 }
 
 environmentSetup();
