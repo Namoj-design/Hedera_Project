@@ -1,5 +1,6 @@
 const {
     Client,
+    AccountId,
     PrivateKey,
     AccountCreateTransaction,
     AccountBalanceQuery,
@@ -10,6 +11,7 @@ const {
 require("dotenv").config();
 
 async function environmentSetup() {
+    // Grab operator ID and private key from .env
     const myAccountId = process.env.MY_ACCOUNT_ID;
     const myPrivateKey = process.env.MY_PRIVATE_KEY;
 
@@ -19,8 +21,13 @@ async function environmentSetup() {
         );
     }
 
-    const client = Client.forTestnet();
-    client.setOperator(myAccountId, myPrivateKey);
+    // Explicitly parse the account ID and private key
+    const operatorId = AccountId.fromString(myAccountId);
+    const operatorKey = PrivateKey.fromStringED25519(myPrivateKey);
+
+    // Create client
+    const client = Client.forTestnet().setOperator(operatorId, operatorKey);
+
     client.setDefaultMaxTransactionFee(new Hbar(100));
     client.setMaxQueryPayment(new Hbar(50));
 
@@ -34,11 +41,10 @@ async function environmentSetup() {
         .setInitialBalance(Hbar.fromTinybars(1000))
         .execute(client);
 
-    // Get receipt
     const newAccountReceipt = await newAccountTransactionResponse.getReceipt(client);
     const newAccountId = newAccountReceipt.accountId;
 
-    console.log("The new account ID is: " + newAccountId.toString());
+    console.log("✅ New account created: " + newAccountId.toString());
 
     // Query balance
     const accountBalance = await new AccountBalanceQuery()
@@ -46,8 +52,14 @@ async function environmentSetup() {
         .execute(client);
 
     console.log(
-        "The new account balance is: " + accountBalance.hbars.toTinybars() + " tinybars."
+        "💰 New account balance: " +
+            accountBalance.hbars.toTinybars() +
+            " tinybars."
     );
+
+    return { client, newAccountId, newAccountPrivateKey };
 }
 
-environmentSetup();
+environmentSetup()
+    .then(() => console.log("Setup complete"))
+    .catch((err) => console.error("Error during setup:", err));
