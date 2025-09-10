@@ -32,7 +32,19 @@ async function environmentSetup() {
     // Set the maximum payment for queries (in Hbar)
     client.setMaxQueryPayment(new Hbar(50));
 
-    return client; // returning is useful later
+    
+
+
+
+    const newAccountPrivateKey = PrivateKey.generateED25519();
+    const newAccountPublicKey = newAccountPrivateKey.publicKey;
+
+    
+
+
+
+
+
 }
 
 environmentSetup();
