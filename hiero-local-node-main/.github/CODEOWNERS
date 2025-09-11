@@ -1,0 +1,43 @@
+###################################
+##### Global Protection Rule ######
+###################################
+# NOTE: This rule is overriden by the more specific rules below. This is the catch-all rule for all files not covered by the more specific rules below.
+*                                                       @hiero-ledger/hiero-local-node-maintainers
+
+#########################
+#####  Core Files  ######
+#########################
+
+# NOTE: Must be placed last to ensure enforcement over all other rules
+
+# Protection Rules for Github Configuration Files and Actions Workflows
+/.github/                                               @hiero-ledger/github-maintainers
+/.github/workflows/                                     @hiero-ledger/github-maintainers
+
+# Legacy Maven project files
+**/pom.xml                                              @hiero-ledger/github-maintainers
+
+# Cmake project files and inline plugins
+**/.clang*                                              @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/github-maintainers
+**/.clang-format                                        @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/github-maintainers
+**/.clang-tidy                                          @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/github-maintainers
+**/CMakeLists.txt                                       @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/github-maintainers
+**/CMakePresets.json                                    @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/github-maintainers
+
+# Codacy Tool Configurations
+/config/                                                @hiero-ledger/github-maintainers
+.remarkrc                                               @hiero-ledger/github-maintainers
+
+# Self-protection for root CODEOWNERS files (this file should not exist and should definitely require approval)
+/CODEOWNERS                                             @hiero-ledger/github-maintainers
+
+# Protect the repository root files
+/README.md                                              @hiero-ledger/github-maintainers @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/hiero-local-node-committers @hiero-ledger/tsc
+**/LICENSE                                              @hiero-ledger/github-maintainers @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/tsc
+
+# CodeCov configuration
+**/codecov.yml                                          @hiero-ledger/github-maintainers
+
+# Git Ignore definitions
+**/.gitignore                                           @hiero-ledger/github-maintainers @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/tsc
+**/.gitignore.*                                         @hiero-ledger/github-maintainers @hiero-ledger/hiero-local-node-maintainers @hiero-ledger/tsc

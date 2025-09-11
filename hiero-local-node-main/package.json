@@ -1,0 +1,91 @@
+{
+  "name": "@hashgraph/hedera-local",
+  "version": "2.37.1",
+  "description": "Developer tooling for running Local Hedera Network (Consensus + Mirror Nodes).",
+  "main": "index.ts",
+  "scripts": {
+    "build": "rimraf ./build && tsc",
+    "start": "npm run build && node ./build/index.js start",
+    "start:block-node": "npm run build && node ./build/index.js start --enable-block-node",
+    "start:multinode": "FIRING_UP_RETRY_ATTEMPTS=1000 npm run start -- --multinode",
+    "start:multinode:block-node": "FIRING_UP_RETRY_ATTEMPTS=1000 npm run start -- --multinode --enable-block-node",
+    "restart": "npm run build && node ./build/index.js restart",
+    "stop": "npm run build && node ./build/index.js stop",
+    "generate-accounts": "npm run build && node ./build/index.js generate-accounts",
+    "test:smoke": "npm --prefix test/smoke run test",
+    "prepare": "husky install",
+    "lint": "eslint src/**/*.ts",
+    "lint-fix": "eslint --fix src/**/*.ts",
+    "pretty": "prettier --write 'src/**/*.ts'",
+    "precommit": "npm run pretty",
+    "prepush": "npm run lint",
+    "prepublishOnly": "npm run build",
+    "test": "nyc ts-mocha ./test/unit/**/*.spec.ts"
+  },
+  "bin": {
+    "hedera": "./build/index.js"
+  },
+  "keywords": [
+    "hedera",
+    "hedera-local"
+  ],
+  "homepage": "https://github.com/hashgraph/hedera-local-node",
+  "repository": "github.com:hashgraph/hedera-local-node",
+  "author": "hashgraph",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/release-notes-generator": "^14.0.1",
+    "@types/chai": "4.3.16",
+    "@types/detect-port": "^1.3.5",
+    "@types/dockerode": "^3.3.29",
+    "@types/expect": "^24.3.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/mocha": "^10.0.7",
+    "@types/semver": "^7.5.8",
+    "@types/shelljs": "^0.8.15",
+    "@types/sinon": "^17.0.3",
+    "@types/yargs": "^17.0.32",
+    "@typescript-eslint/eslint-plugin": "^8.0.1",
+    "@typescript-eslint/parser": "^8.0.1",
+    "chai": "4.3.6",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "eslint": "^8.51.0",
+    "eslint-config-airbnb": "^19.0.4",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "husky": "^9.0.11",
+    "mocha": "^10.7.0",
+    "nyc": "^17.0.0",
+    "prettier": "^3.3.2",
+    "semantic-release": "^24.2.3",
+    "sinon": "^19.0.2",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "@hashgraph/sdk": "2.66.0",
+    "csv-parser": "^3.2.0",
+    "detect-port": "^1.6.1",
+    "dockerode": "^4.0.6",
+    "dotenv": "^16.5.0",
+    "ethers": "^6.13.5",
+    "js-yaml": "^4.1.0",
+    "rimraf": "^6.0.1",
+    "semver": "^7.7.1",
+    "shelljs": "^0.8.5",
+    "ts-mocha": "^11.1.0",
+    "yargs": "^17.7.2"
+  },
+  "nyc": {
+    "check-coverage": false,
+    "reporter": [
+      "html",
+      "lcov",
+      "text",
+      "text-summary"
+    ],
+    "report-dir": "coverage"
+  }
+}
