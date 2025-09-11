@@ -28,11 +28,11 @@ async function environmentSetup() {
     let client;
     if (process.env.NETWORK === "local") {
         // Local network configuration
-        const nodes = {
+        client = Client.forNetwork({
             "127.0.0.1:50211": new AccountId(3),
-        };
-        client = Client.forNetwork(nodes).setOperator(operatorId, operatorKey);
-        client.setMirrorNetwork(["127.0.0.1:5600"]);
+        })
+        .setMirrorNetwork(["127.0.0.1:5600"])
+        .setOperator(operatorId, operatorKey);
     } else {
         // Default to testnet
         client = Client.forTestnet().setOperator(operatorId, operatorKey);
@@ -43,7 +43,7 @@ async function environmentSetup() {
     client.setMaxAttempts(5);
     client.setRequestTimeout(120_000);                               
 
-    // Generate new account keys
+    // Generate new account keyss
     const newAccountPrivateKey = PrivateKey.generateED25519();
     const newAccountPublicKey = newAccountPrivateKey.publicKey;
 
