@@ -25,18 +25,28 @@ async function environmentSetup() {
     const operatorKey = PrivateKey.fromStringED25519(myPrivateKey);
 
     // Create client using explicit node map and robust settings
-    const nodes = {
-        "34.94.106.61:50212": new AccountId(3),
-        "35.237.119.55:50212": new AccountId(4),
-        "35.245.27.193:50212": new AccountId(5),
-        "34.83.112.116:50212": new AccountId(6),
-        "34.94.160.4:50212": new AccountId(7),
-        "34.106.102.218:50212": new AccountId(8),
-        "34.133.197.230:50212": new AccountId(9),
-    };
-
-    const client = Client.forNetwork(nodes).setOperator(operatorId, operatorKey);
-    client.setMirrorNetwork(["https://testnet.mirrornode.hedera.com:443"]);
+    let client;
+    if (process.env.NETWORK === "local") {
+        // Local network configuration
+        const nodes = {
+            "127.0.0.1:50211": new AccountId(3),
+        };
+        client = Client.forNetwork(nodes).setOperator(operatorId, operatorKey);
+        client.setMirrorNetwork(["127.0.0.1:5600"]);
+    } else {
+        // Default to testnet
+        const nodes = {
+            "34.94.106.61:50212": new AccountId(3),
+            "35.237.119.55:50212": new AccountId(4),
+            "35.245.27.193:50212": new AccountId(5),
+            "34.83.112.116:50212": new AccountId(6),
+            "34.94.160.4:50212": new AccountId(7),
+            "34.106.102.218:50212": new AccountId(8),
+            "34.133.197.230:50212": new AccountId(9),
+        };
+        client = Client.forNetwork(nodes).setOperator(operatorId, operatorKey);
+        client.setMirrorNetwork(["https://testnet.mirrornode.hedera.com:443"]);
+    }
     client.setDefaultMaxTransactionFee(new Hbar(100));
     client.setMaxQueryPayment(new Hbar(50));
     client.setMaxAttempts(5);
