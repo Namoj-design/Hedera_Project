@@ -47,6 +47,9 @@ async function environmentSetup() {
     const newAccountPrivateKey = PrivateKey.generateED25519();
     const newAccountPublicKey = newAccountPrivateKey.publicKey;
 
+    console.log("New account private key: " + newAccountPrivateKey.toString());
+    console.log("New account public key: " + newAccountPublicKey.toString());
+
     // Create new account
     const newAccountTransactionResponse = await new AccountCreateTransaction()
         .setKey(newAccountPublicKey)
@@ -88,6 +91,8 @@ async function environmentSetup() {
 
     console.log("Operator balance: " + operatorBalance.hbars.toTinybars() + " tinybars");
     console.log("New account balance: " + newAccountBalance.hbars.toTinybars() + " tinybars");
+
+    process.exit(0);
 
     return { client, newAccountId, newAccountPrivateKey };
 }
