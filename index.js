@@ -38,15 +38,19 @@ async function environmentSetup() {
                 const newAccountPublicKey = newAccountPrivateKey.publicKey;
                 console.log(`Attempt ${attempt}: Creating new account...`);
 
-                const newAccountTxResp = await new AccountCreateTransaction()
+                const newAccountTx = await new AccountCreateTransaction()
                     .setKey(newAccountPublicKey)
                     .setInitialBalance(Hbar.fromTinybars(100000000)) // 1 Hbar
-                    .execute(client);
+                    .freezeWith(client);
 
-                const newAccountReceipt = await newAccountTxResp.getReceipt(client);
+                // Sign with operator key (payer) to fix INVALID_SIGNATURE
+                const newAccountTxSign = await newAccountTx.sign(operatorKey);
+                const newAccountTxSubmit = await newAccountTxSign.execute(client);
+                const newAccountReceipt = await newAccountTxSubmit.getReceipt(client);
                 newAccountId = newAccountReceipt.accountId;
                 console.log("New account created: " + newAccountId.toString());
                 break;
+
             } catch (err) {
                 console.warn(`Attempt ${attempt} failed: ${err.message}`);
                 if (attempt === 5) throw new Error("Failed to create new account after 5 attempts.");
