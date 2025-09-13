@@ -17,6 +17,10 @@ require("dotenv").config();
 const MAX_RETRIES = 5;
 const MAX_BATCH_SIZE = 5;
 
+function checkEnvVar(varName) {
+    return process.env[varName] && process.env[varName].trim() !== "";
+}
+
 async function executeTransaction(transaction, key, client) {
     let retries = 0;
     while (retries < MAX_RETRIES) {
@@ -50,7 +54,45 @@ async function mintNFTBatch(tokenId, metadataArray, supplyKey, client) {
     }
 }
 
+async function ensureAliceAccount(client) {
+    try {
+        if (checkEnvVar('ALICE_ACCOUNT_ID') && checkEnvVar('ALICE_PRIVATE_KEY')) {
+            const aliceId = AccountId.fromString(process.env.ALICE_ACCOUNT_ID);
+            const aliceKey = PrivateKey.fromStringED25519(process.env.ALICE_PRIVATE_KEY);
+            return { aliceId, aliceKey };
+        }
+    } catch (err) {
+        console.warn("Invalid Alice credentials in .env, creating a new Alice account...");
+    }
+
+    console.log("Creating a new Alice account...");
+    const alicePrivateKey = PrivateKey.generateED25519();
+    const alicePublicKey = alicePrivateKey.publicKey;
+
+    const newAccountTx = await new AccountCreateTransaction()
+        .setKey(alicePublicKey)
+        .setInitialBalance(new Hbar(10)) // fund Alice with 10 test HBAR
+        .execute(client);
+
+    const receipt = await newAccountTx.getReceipt(client);
+    const aliceAccountId = receipt.accountId;
+
+    console.log("====================================================");
+    console.log("🚀 New Alice account created");
+    console.log("Alice Account ID:", aliceAccountId.toString());
+    console.log("Alice Public Key:", alicePublicKey.toString());
+    console.log("Alice Private Key:", alicePrivateKey.toString());
+    console.log("⚠️ Please update your .env with these values for future runs.");
+    console.log("====================================================");
+
+    return { aliceId: aliceAccountId, aliceKey: alicePrivateKey };
+}
+
 async function main() {
+    if (!checkEnvVar('MY_ACCOUNT_ID') || !checkEnvVar('MY_PRIVATE_KEY')) {
+        throw new Error("MY_ACCOUNT_ID and MY_PRIVATE_KEY must be set in .env");
+    }
+
     const operatorId = AccountId.fromString(process.env.MY_ACCOUNT_ID);
     const operatorKey = PrivateKey.fromStringED25519(process.env.MY_PRIVATE_KEY);
 
@@ -59,6 +101,9 @@ async function main() {
     client.setMaxQueryPayment(new Hbar(50));
     client.setMaxAttempts(10);
     client.setRequestTimeout(300000);
+
+    // Ensure Alice account exists or create a new one
+    const { aliceId, aliceKey } = await ensureAliceAccount(client);
 
     // Use operator as treasury account
     const treasuryKey = operatorKey;
@@ -95,11 +140,8 @@ async function main() {
     console.log("NFT minting complete.");
 
     // Associate NFT with Alice
-    const aliceId = AccountId.fromString(process.env.ALICE_ACCOUNT_ID);
-    const aliceKey = PrivateKey.fromStringED25519(process.env.ALICE_PRIVATE_KEY);
-
     console.log("Associating NFT with Alice's account...");
-    const associateAliceTx = await new TokenAssociateTransaction()
+    const associateAliceTx = new TokenAssociateTransaction()
         .setAccountId(aliceId)
         .setTokenIds([tokenId])
         .freezeWith(client)
@@ -116,7 +158,7 @@ async function main() {
     console.log(`- Alice's balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
 
     // Transfer NFT from treasury to Alice
-    const tokenTransferTx = await new TransferTransaction()
+    const tokenTransferTx = new TransferTransaction()
         .addNftTransfer(tokenId, 1, operatorId, aliceId)
         .freezeWith(client)
         .sign(treasuryKey);
