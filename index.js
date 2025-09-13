@@ -31,32 +31,20 @@ async function environmentSetup() {
         client.setRequestTimeout(300_000); // 5 minutes
 
         console.log("Generating new account...");
-        let newAccountId, newAccountPrivateKey;
-        for (let attempt = 1; attempt <= 5; attempt++) {
-            try {
-                newAccountPrivateKey = PrivateKey.generateED25519();
-                const newAccountPublicKey = newAccountPrivateKey.publicKey;
-                console.log(`Attempt ${attempt}: Creating new account...`);
+        const newAccountPrivateKey = PrivateKey.generateED25519();
+        const newAccountPublicKey = newAccountPrivateKey.publicKey;
 
-                const newAccountTx = await new AccountCreateTransaction()
-                    .setKey(newAccountPublicKey)
-                    .setInitialBalance(Hbar.fromTinybars(100000000)) // 1 Hbar
-                    .freezeWith(client);
+        const newAccountTx = await new AccountCreateTransaction()
+            .setKey(newAccountPublicKey)
+            .setInitialBalance(Hbar.fromTinybars(100000000)) // 1 Hbar
+            .freezeWith(client);
 
-                // Sign with operator key (payer) to fix INVALID_SIGNATURE
-                const newAccountTxSign = await newAccountTx.sign(operatorKey);
-                const newAccountTxSubmit = await newAccountTxSign.execute(client);
-                const newAccountReceipt = await newAccountTxSubmit.getReceipt(client);
-                newAccountId = newAccountReceipt.accountId;
-                console.log("New account created: " + newAccountId.toString());
-                break;
-
-            } catch (err) {
-                console.warn(`Attempt ${attempt} failed: ${err.message}`);
-                if (attempt === 5) throw new Error("Failed to create new account after 5 attempts.");
-                await new Promise(res => setTimeout(res, 5000));
-            }
-        }
+        // Sign with operator key (payer) to fix INVALID_SIGNATURE
+        const newAccountTxSign = await newAccountTx.sign(operatorKey);
+        const newAccountTxSubmit = await newAccountTxSign.execute(client);
+        const newAccountReceipt = await newAccountTxSubmit.getReceipt(client);
+        const newAccountId = newAccountReceipt.accountId;
+        console.log("New account created: " + newAccountId.toString());
 
         let newAccountBalance = await new AccountBalanceQuery().setAccountId(newAccountId).execute(client);
         console.log("New account balance: " + newAccountBalance.hbars.toTinybars() + " tinybars");
