@@ -9,14 +9,7 @@ const {
     TokenCreateTransaction,
     TokenType,
     TokenSupplyType,
-    TokenMintTransaction,
-    TokenBurnTransaction,
-    TokenAssociateTransaction,
-    TokenFreezeTransaction,
-    TokenGrantKycTransaction,
-    TokenPauseTransaction,
-    TokenWipeTransaction,
-    TokenNftInfoQuery
+    TokenMintTransaction
 } = require("@hashgraph/sdk");
 
 require("dotenv").config();
@@ -31,46 +24,38 @@ async function environmentSetup() {
         const operatorId = AccountId.fromString(myAccountId);
         const operatorKey = PrivateKey.fromStringED25519(myPrivateKey);
 
-        let client;
-        if (process.env.NETWORK === "local") {
-            client = Client.forNetwork({"127.0.0.1:50211": new AccountId(3)})
-                .setMirrorNetwork(["127.0.0.1:5600"])
-                .setOperator(operatorId, operatorKey);
-        } else {
-            client = Client.forTestnet().setOperator(operatorId, operatorKey);
-            client.setMirrorNetwork(["https://testnet.mirrornode.hedera.com:443"]);
-        }
-
+        const client = Client.forTestnet().setOperator(operatorId, operatorKey);
         client.setDefaultMaxTransactionFee(new Hbar(100));
         client.setMaxQueryPayment(new Hbar(50));
-        client.setMaxAttempts(5);
-        client.setRequestTimeout(120_000);
+        client.setMaxAttempts(10);
+        client.setRequestTimeout(300_000); // 5 minutes
 
-        // Generate new account
-        const newAccountPrivateKey = PrivateKey.generateED25519();
-        const newAccountPublicKey = newAccountPrivateKey.publicKey;
-        console.log("New account private key: " + newAccountPrivateKey.toString());
-        console.log("New account public key: " + newAccountPublicKey.toString());
+        console.log("Generating new account...");
+        let newAccountId, newAccountPrivateKey;
+        for (let attempt = 1; attempt <= 5; attempt++) {
+            try {
+                newAccountPrivateKey = PrivateKey.generateED25519();
+                const newAccountPublicKey = newAccountPrivateKey.publicKey;
+                console.log(`Attempt ${attempt}: Creating new account...`);
 
-        console.log("Creating new account with sufficient Hbar for token creation...");
-        const newAccountTxResp = await new AccountCreateTransaction()
-            .setKey(newAccountPublicKey)
-            .setInitialBalance(Hbar.fromTinybars(10000000)) // increased balance to cover fees
-            .execute(client);
-        const newAccountReceipt = await newAccountTxResp.getReceipt(client);
-        const newAccountId = newAccountReceipt.accountId;
-        console.log("New account created: " + newAccountId.toString());
+                const newAccountTxResp = await new AccountCreateTransaction()
+                    .setKey(newAccountPublicKey)
+                    .setInitialBalance(Hbar.fromTinybars(100000000)) // 1 Hbar
+                    .execute(client);
+
+                const newAccountReceipt = await newAccountTxResp.getReceipt(client);
+                newAccountId = newAccountReceipt.accountId;
+                console.log("New account created: " + newAccountId.toString());
+                break;
+            } catch (err) {
+                console.warn(`Attempt ${attempt} failed: ${err.message}`);
+                if (attempt === 5) throw new Error("Failed to create new account after 5 attempts.");
+                await new Promise(res => setTimeout(res, 5000));
+            }
+        }
 
         let newAccountBalance = await new AccountBalanceQuery().setAccountId(newAccountId).execute(client);
         console.log("New account balance: " + newAccountBalance.hbars.toTinybars() + " tinybars");
-
-        // Transfer Hbar
-        const transferTx = await new TransferTransaction()
-            .addHbarTransfer(operatorId, Hbar.fromTinybars(-10000000))
-            .addHbarTransfer(newAccountId, Hbar.fromTinybars(10000000))
-            .execute(client);
-        await transferTx.getReceipt(client);
-        console.log("Transfer complete.");
 
         // Token Operations
         const treasuryKey = newAccountPrivateKey;
@@ -102,38 +87,6 @@ async function environmentSetup() {
             console.log("Fungible Token minted, status:", mintFTRx.status.toString());
         } catch(err) {
             console.error("Error with fungible token operations:", err);
-        }
-
-        console.log("Creating NFT Token...");
-        try {
-            const nftCreateTx = await new TokenCreateTransaction()
-                .setTokenName("Diploma")
-                .setTokenSymbol("GRAD")
-                .setTokenType(TokenType.NonFungibleUnique)
-                .setDecimals(0)
-                .setInitialSupply(0)
-                .setTreasuryAccountId(newAccountId)
-                .setSupplyType(TokenSupplyType.Finite)
-                .setSupplyKey(supplyKey)
-                .freezeWith(client);
-            const nftCreateTxSign = await nftCreateTx.sign(treasuryKey);
-            const nftCreateSubmit = await nftCreateTxSign.execute(client);
-            const nftCreateRx = await nftCreateSubmit.getReceipt(client);
-            const nftTokenId = nftCreateRx.tokenId;
-            console.log("NFT Token created with ID:", nftTokenId.toString());
-
-            console.log("Minting NFT Token...");
-            const CID = "ipfs://QmYourNFTMetadataHere";
-            const mintNFTTx = await new TokenMintTransaction()
-                .setTokenId(nftTokenId)
-                .setMetadata([Buffer.from(CID)])
-                .freezeWith(client);
-            const mintNFTTxSign = await mintNFTTx.sign(supplyKey);
-            const mintNFTTxSubmit = await mintNFTTxSign.execute(client);
-            const mintNFTRx = await mintNFTTxSubmit.getReceipt(client);
-            console.log(`NFT minted with serial: ${mintNFTRx.serials[0].low}`);
-        } catch(err) {
-            console.error("Error with NFT token operations:", err);
         }
 
         console.log("All token operations complete.");
