@@ -197,8 +197,6 @@ async function environmentSetup() {
     const transferNFTSubmit = await transferNFTTx.execute(client);
     await transferNFTSubmit.getReceipt(client);
     console.log("NFT transfer complete.");
-
-    process.exit(0);
 }
 
 environmentSetup()
