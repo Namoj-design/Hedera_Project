@@ -141,7 +141,7 @@ async function main() {
 
     // Associate NFT with Alice
     console.log("Associating NFT with Alice's account...");
-    const associateAliceTx = new TokenAssociateTransaction()
+    const associateAliceTx = await new TokenAssociateTransaction()
         .setAccountId(aliceId)
         .setTokenIds([tokenId])
         .freezeWith(client)
@@ -158,7 +158,7 @@ async function main() {
     console.log(`- Alice's balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
 
     // Transfer NFT from treasury to Alice
-    const tokenTransferTx = new TransferTransaction()
+    const tokenTransferTx = await new TransferTransaction()
         .addNftTransfer(tokenId, 1, operatorId, aliceId)
         .freezeWith(client)
         .sign(treasuryKey);
