@@ -1,211 +1,135 @@
-console.clear();
-import "dotenv/config";
+const {
+    Client,
+    AccountId,
+    PrivateKey,
+    Hbar,
+    AccountCreateTransaction,
+    AccountBalanceQuery,
+    TokenCreateTransaction,
+    TokenType,
+    TokenSupplyType,
+    TokenMintTransaction,
+    TokenAssociateTransaction,
+    TransferTransaction
+} = require("@hashgraph/sdk");
+require("dotenv").config();
 
-import {
-  Hbar,
-  Client,
-  AccountId,
-  PrivateKey,
-  AccountCreateTransaction,
-  TokenType,
-  TokenSupplyType,
-  TokenMintTransaction,
-  TransferTransaction,
-  AccountBalanceQuery,
-  TokenCreateTransaction,
-  TokenAssociateTransaction,
-} from "@hashgraph/sdk";
+const MAX_RETRIES = 5;
+const MAX_BATCH_SIZE = 5;
 
-// Operator credentials
-const operatorId = AccountId.fromString(process.env.OPERATOR_ID);
-
-// flexible private key parser
-function parsePriv(str) {
-  try {
-    return PrivateKey.fromStringECDSA(str);
-  } catch {
-    return PrivateKey.fromStringED25519(str);
-  }
+async function executeTransaction(transaction, key, client) {
+    let retries = 0;
+    while (retries < MAX_RETRIES) {
+        try {
+            const txSign = await transaction.sign(key);
+            const txSubmit = await txSign.execute(client);
+            const txReceipt = await txSubmit.getReceipt(client);
+            return txReceipt;
+        } catch (err) {
+            if (err.toString().includes('BUSY')) {
+                retries++;
+                console.log(`Hedera BUSY retry attempt: ${retries}`);
+                await new Promise(res => setTimeout(res, 2000));
+            } else {
+                throw err;
+            }
+        }
+    }
+    throw new Error(`Transaction failed after ${MAX_RETRIES} attempts`);
 }
-const operatorKey = parsePriv(process.env.OPERATOR_KEY);
+
+async function mintNFTBatch(tokenId, metadataArray, supplyKey, client) {
+    for (let i = 0; i < metadataArray.length; i += MAX_BATCH_SIZE) {
+        const batch = metadataArray.slice(i, i + MAX_BATCH_SIZE);
+        const mintTx = new TokenMintTransaction()
+            .setTokenId(tokenId)
+            .setMetadata(batch)
+            .freezeWith(client);
+        const mintRx = await executeTransaction(mintTx, supplyKey, client);
+        console.log(`Minted NFT batch with serials: ${mintRx.serials}`);
+    }
+}
 
 async function main() {
-  // Initialize client
-  const client = Client.forTestnet().setOperator(operatorId, operatorKey);
-  client.setDefaultMaxTransactionFee(new Hbar(20));
+    const operatorId = AccountId.fromString(process.env.MY_ACCOUNT_ID);
+    const operatorKey = PrivateKey.fromStringED25519(process.env.MY_PRIVATE_KEY);
 
-  // Generate Treasury key
-  const treasuryKey = PrivateKey.generateECDSA();
-  const treasuryPublicKey = treasuryKey.publicKey;
-  
-  // Create Treasury account
-  const treasuryTx = await new AccountCreateTransaction()
-    .setECDSAKeyWithAlias(treasuryPublicKey)
-    .setInitialBalance(new Hbar(20))
-    .execute(client);
-  const treasuryId = (await treasuryTx.getReceipt(client)).accountId;
+    const client = Client.forTestnet().setOperator(operatorId, operatorKey);
+    client.setDefaultMaxTransactionFee(new Hbar(100));
+    client.setMaxQueryPayment(new Hbar(50));
+    client.setMaxAttempts(10);
+    client.setRequestTimeout(300000);
 
-  // Generate Alice's key
-  const aliceKey = PrivateKey.generateECDSA();
-  const alicePublicKey = aliceKey.publicKey;
-  
-  // Create Alice's account
-  const aliceTx = await new AccountCreateTransaction()
-    .setECDSAKeyWithAlias(alicePublicKey)
-    .setInitialBalance(new Hbar(20))
-    .execute(client);
-  const aliceId = (await aliceTx.getReceipt(client)).accountId;
+    // Use operator as treasury account
+    const treasuryKey = operatorKey;
+    const supplyKey = treasuryKey;
 
-  // Generate supply key
-  const supplyKey = PrivateKey.generateECDSA();
+    console.log("Creating NFT Token...");
+    const nftCreate = new TokenCreateTransaction()
+        .setTokenName("Diploma")
+        .setTokenSymbol("GRAD")
+        .setTokenType(TokenType.NonFungibleUnique)
+        .setDecimals(0)
+        .setInitialSupply(0)
+        .setTreasuryAccountId(operatorId)
+        .setSupplyType(TokenSupplyType.Finite)
+        .setMaxSupply(250)
+        .setSupplyKey(supplyKey)
+        .freezeWith(client);
 
-  // Create the NFT
-  const nftCreate = new TokenCreateTransaction()
-    .setTokenName("diploma")
-    .setTokenSymbol("GRAD")
-    .setTokenType(TokenType.NonFungibleUnique)
-    .setDecimals(0)
-    .setInitialSupply(0)
-    .setTreasuryAccountId(treasuryId)
-    .setSupplyType(TokenSupplyType.Finite)
-    .setMaxSupply(250)
-    .setSupplyKey(supplyKey)
-    .freezeWith(client);
+    const nftCreateRx = await executeTransaction(nftCreate, treasuryKey, client);
+    const tokenId = nftCreateRx.tokenId;
+    console.log(`NFT Token created with ID: ${tokenId}`);
 
-  // Sign the transaction with the treasury key
-  const nftCreateTxSign = await nftCreate.sign(treasuryKey);
+    // IPFS metadata CIDs
+    const CID = [
+        Buffer.from("ipfs://bafyreiao6ajgsfji6qsgbqwdtjdu5gmul7tv2v3pd6kjgcw5o65b2ogst4/metadata.json"),
+        Buffer.from("ipfs://bafyreic463uarchq4mlufp7pvfkfut7zeqsqmn3b2x3jjxwcjqx6b5pk7q/metadata.json"),
+        Buffer.from("ipfs://bafyreihhja55q6h2rijscl3gra7a3ntiroyglz45z5wlyxdzs6kjh2dinu/metadata.json"),
+        Buffer.from("ipfs://bafyreidb23oehkttjbff3gdi4vz7mjijcxjyxadwg32pngod4huozcwphu/metadata.json"),
+        Buffer.from("ipfs://bafyreie7ftl6erd5etz5gscfwfiwjmht3b52cevdrf7hjwxx5ddns7zneu/metadata.json")
+    ];
 
-  // Submit the transaction to a Hedera network
-  const nftCreateSubmit = await nftCreateTxSign.execute(client);
+    console.log("Minting NFTs in batches...");
+    await mintNFTBatch(tokenId, CID, supplyKey, client);
+    console.log("NFT minting complete.");
 
-  // Get the transaction receipt
-  const nftCreateRx = await nftCreateSubmit.getReceipt(client);
+    // Associate NFT with Alice
+    const aliceId = AccountId.fromString(process.env.ALICE_ACCOUNT_ID);
+    const aliceKey = PrivateKey.fromStringED25519(process.env.ALICE_PRIVATE_KEY);
 
-  // Get the token ID
-  const tokenId = nftCreateRx.tokenId;
+    console.log("Associating NFT with Alice's account...");
+    const associateAliceTx = await new TokenAssociateTransaction()
+        .setAccountId(aliceId)
+        .setTokenIds([tokenId])
+        .freezeWith(client)
+        .sign(aliceKey);
+    const associateAliceRx = await associateAliceTx.execute(client);
+    const associateReceipt = await associateAliceRx.getReceipt(client);
+    console.log(`NFT association with Alice's account: ${associateReceipt.status} ✅`);
 
-  // Log the token ID
-  console.log(`\nCreated NFT with token ID: ${tokenId}`);
+    // Check balances before transfer
+    let balanceCheckTx = await new AccountBalanceQuery().setAccountId(operatorId).execute(client);
+    console.log(`- Treasury balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
 
-  // IPFS content identifiers for which we will create a NFT
-  const CID = [
-    Buffer.from(
-      "ipfs://bafyreiao6ajgsfji6qsgbqwdtjdu5gmul7tv2v3pd6kjgcw5o65b2ogst4/metadata.json"
-    ),
-    Buffer.from(
-      "ipfs://bafyreic463uarchq4mlufp7pvfkfut7zeqsqmn3b2x3jjxwcjqx6b5pk7q/metadata.json"
-    ),
-    Buffer.from(
-      "ipfs://bafyreihhja55q6h2rijscl3gra7a3ntiroyglz45z5wlyxdzs6kjh2dinu/metadata.json"
-    ),
-    Buffer.from(
-      "ipfs://bafyreidb23oehkttjbff3gdi4vz7mjijcxjyxadwg32pngod4huozcwphu/metadata.json"
-    ),
-    Buffer.from(
-      "ipfs://bafyreie7ftl6erd5etz5gscfwfiwjmht3b52cevdrf7hjwxx5ddns7zneu/metadata.json"
-    ),
-  ];
+    balanceCheckTx = await new AccountBalanceQuery().setAccountId(aliceId).execute(client);
+    console.log(`- Alice's balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
 
-  // MINT NEW BATCH OF NFTs
-  const mintTx = await new TokenMintTransaction()
-    .setTokenId(tokenId)
-    .setMetadata(CID) // up to 10 entries per tx
-    .freezeWith(client);
+    // Transfer NFT from treasury to Alice
+    const tokenTransferTx = await new TransferTransaction()
+        .addNftTransfer(tokenId, 1, operatorId, aliceId)
+        .freezeWith(client)
+        .sign(treasuryKey);
+    const tokenTransferSubmit = await tokenTransferTx.execute(client);
+    const tokenTransferRx = await tokenTransferSubmit.getReceipt(client);
+    console.log(`\nNFT transfer from treasury to Alice: ${tokenTransferRx.status} ✅`);
 
-  // Sign the transaction with the supply key
-  const mintTxSign = await mintTx.sign(supplyKey);
+    // Check balances after transfer
+    balanceCheckTx = await new AccountBalanceQuery().setAccountId(operatorId).execute(client);
+    console.log(`- Treasury balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
 
-  // Submit the transaction to a Hedera network
-  const mintTxSubmit = await mintTxSign.execute(client);
-
-  // Get the transaction receipt
-  const mintRx = await mintTxSubmit.getReceipt(client);
-
-  // Log the serial number
-  console.log(
-    `Created NFT ${tokenId} with serial number(s): ${mintRx.serials}\n`
-  );
-
-  // Create the associate transaction and sign with Alice's key
-  const associateAliceTx = await new TokenAssociateTransaction()
-    .setAccountId(aliceId)
-    .setTokenIds([tokenId])
-    .freezeWith(client)
-    .sign(aliceKey);
-
-  // Submit the transaction to a Hedera network
-  const associateAliceTxSubmit = await associateAliceTx.execute(client);
-
-  // Get the transaction receipt
-  const associateAliceRx = await associateAliceTxSubmit.getReceipt(client);
-
-  // Confirm the transaction was successful
-  console.log(
-    `NFT association with Alice's account: ${associateAliceRx.status} ✅`
-  );
-
-  // Check the balance before the NFT transfer for the treasury account
-  let balanceCheckTx = await new AccountBalanceQuery()
-    .setAccountId(treasuryId)
-    .execute(client);
-  console.log(
-    `- Treasury balance for ${tokenId.toString()}: ${(
-      balanceCheckTx.tokens.get(tokenId) ?? 0
-    ).toString()}`
-  );
-
-  // Check the balance before the NFT transfer for Alice's account
-  balanceCheckTx = await new AccountBalanceQuery()
-    .setAccountId(aliceId)
-    .execute(client);
-  console.log(
-    `- Alice's balance for ${tokenId.toString()}: ${(
-      balanceCheckTx.tokens.get(tokenId) ?? 0
-    ).toString()}`
-  );
-
-  // Transfer the NFT from treasury to Alice
-  // Sign with the treasury key to authorize the transfer
-  const tokenTransferTx = await new TransferTransaction()
-    .addNftTransfer(tokenId, 1, treasuryId, aliceId)
-    .freezeWith(client)
-    .sign(treasuryKey);
-
-  // Submit the transaction to a Hedera network
-  const tokenTransferSubmit = await tokenTransferTx.execute(client);
-
-  // Get the transaction receipt
-  const tokenTransferRx = await tokenTransferSubmit.getReceipt(client);
-
-  // Confirm the transaction was successful
-  console.log(
-    `\nNFT transfer from treasury to Alice: ${tokenTransferRx.status}  ✅`
-  );
-
-  // Check the balance for the treasury account after the transfer
-  balanceCheckTx = await new AccountBalanceQuery()
-    .setAccountId(treasuryId)
-    .execute(client);
-  console.log(
-    `- Treasury balance for ${tokenId.toString()}: ${(
-      balanceCheckTx.tokens.get(tokenId) ?? 0
-    ).toString()}`
-  );
-
-  // Check the balance for Alice's account after the transfer
-  balanceCheckTx = await new AccountBalanceQuery()
-    .setAccountId(aliceId)
-    .execute(client);
-  console.log(
-    `- Alice's balance for ${tokenId.toString()}: ${(
-      balanceCheckTx.tokens.get(tokenId) ?? 0
-    ).toString()}\n`
-  );
-
-  client.close();
+    balanceCheckTx = await new AccountBalanceQuery().setAccountId(aliceId).execute(client);
+    console.log(`- Alice's balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}\n`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+main().then(() => console.log("NFT script completed successfully.")).catch(err => console.error(err));
