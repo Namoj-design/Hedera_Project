@@ -81,6 +81,9 @@ async function environmentSetup() {
             console.error("Error with fungible token operations:", err);
         }
 
+        const updatedBalance = await new AccountBalanceQuery().setAccountId(newAccountId).execute(client);
+        console.log("Updated account balance after FT creation: " + updatedBalance.hbars.toTinybars() + " tinybars");
+
         console.log("All token operations complete.");
 
     } catch (err) {
