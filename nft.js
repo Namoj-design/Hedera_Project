@@ -8,7 +8,9 @@ const {
     TokenCreateTransaction,
     TokenType,
     TokenSupplyType,
-    TokenMintTransaction
+    TokenMintTransaction,
+    TokenAssociateTransaction,
+    TransferTransaction
 } = require("@hashgraph/sdk");
 require("dotenv").config();
 
@@ -91,6 +93,43 @@ async function main() {
     console.log("Minting NFTs in batches...");
     await mintNFTBatch(tokenId, CID, supplyKey, client);
     console.log("NFT minting complete.");
+
+    // Associate NFT with Alice
+    const aliceId = AccountId.fromString(process.env.ALICE_ACCOUNT_ID);
+    const aliceKey = PrivateKey.fromStringED25519(process.env.ALICE_PRIVATE_KEY);
+
+    console.log("Associating NFT with Alice's account...");
+    const associateAliceTx = await new TokenAssociateTransaction()
+        .setAccountId(aliceId)
+        .setTokenIds([tokenId])
+        .freezeWith(client)
+        .sign(aliceKey);
+    const associateAliceRx = await associateAliceTx.execute(client);
+    const associateReceipt = await associateAliceRx.getReceipt(client);
+    console.log(`NFT association with Alice's account: ${associateReceipt.status} ✅`);
+
+    // Check balances before transfer
+    let balanceCheckTx = await new AccountBalanceQuery().setAccountId(operatorId).execute(client);
+    console.log(`- Treasury balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
+
+    balanceCheckTx = await new AccountBalanceQuery().setAccountId(aliceId).execute(client);
+    console.log(`- Alice's balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
+
+    // Transfer NFT from treasury to Alice
+    const tokenTransferTx = await new TransferTransaction()
+        .addNftTransfer(tokenId, 1, operatorId, aliceId)
+        .freezeWith(client)
+        .sign(treasuryKey);
+    const tokenTransferSubmit = await tokenTransferTx.execute(client);
+    const tokenTransferRx = await tokenTransferSubmit.getReceipt(client);
+    console.log(`\nNFT transfer from treasury to Alice: ${tokenTransferRx.status} ✅`);
+
+    // Check balances after transfer
+    balanceCheckTx = await new AccountBalanceQuery().setAccountId(operatorId).execute(client);
+    console.log(`- Treasury balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}`);
+
+    balanceCheckTx = await new AccountBalanceQuery().setAccountId(aliceId).execute(client);
+    console.log(`- Alice's balance for ${tokenId.toString()}: ${balanceCheckTx.tokens.get(tokenId) ?? 0}\n`);
 }
 
 main().then(() => console.log("NFT script completed successfully.")).catch(err => console.error(err));
