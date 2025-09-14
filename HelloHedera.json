@@ -75,5 +75,11 @@
         "type": "function"
       }
     ],
-    "bytecode": "0x..."
+    "bytecode": {
+      "evm": {
+        "bytecode": {
+          "object": "0x..."
+        }
+      }
+    }
   }
