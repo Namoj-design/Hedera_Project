@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-pragma solidity >=0.7.0 <0.8.9;
+pragma solidity ^0.8.9;
 
 contract HelloHedera {
     // the contract's owner, set in the constructor
