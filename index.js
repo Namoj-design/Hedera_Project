@@ -99,7 +99,7 @@ async function environmentSetup() {
 
         // Load compiled contract JSON (replace with actual compiled artifact path)
         const contractJson = JSON.parse(fs.readFileSync("./HelloHedera.json", "utf8"));
-        const bytecode = contractJson.bytecode;
+        const bytecode = contractJson.bytecode.evm.bytecode.object;
 
         // Deploy contract
         const contractTx = new ContractCreateFlow()
